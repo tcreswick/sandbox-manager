@@ -26,8 +26,19 @@ if ! getent_group=$(awk -F: -v n="${SANDBOX_USER}" '$1==n {print; exit}' /etc/gr
     addgroup -g "${SANDBOX_GID}" "${SANDBOX_USER}"
 fi
 if ! getent_passwd=$(awk -F: -v n="${SANDBOX_USER}" '$1==n {print; exit}' /etc/passwd) || [ -z "${getent_passwd}" ]; then
-    adduser -D -u "${SANDBOX_UID}" -G "${SANDBOX_USER}" -s /bin/sh "${SANDBOX_USER}"
+    adduser -D -H -u "${SANDBOX_UID}" -G "${SANDBOX_USER}" -h "/home/${SANDBOX_USER}" -s /bin/sh "${SANDBOX_USER}"
 fi
+
+# Ensure the home directory exists, is owned by the user, populated from /etc/skel.
+user_home="/home/${SANDBOX_USER}"
+if [ ! -d "${user_home}" ]; then
+    mkdir -p "${user_home}"
+    if [ -d /etc/skel ]; then
+        cp -aT /etc/skel "${user_home}" 2>/dev/null || cp -a /etc/skel/. "${user_home}/"
+    fi
+fi
+chown -R "${SANDBOX_USER}:${SANDBOX_USER}" "${user_home}"
+chmod 750 "${user_home}"
 
 # Passwordless sudo for the sandbox user (effective once sudo is installed).
 mkdir -p /etc/sudoers.d

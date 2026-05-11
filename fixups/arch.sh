@@ -23,7 +23,18 @@ if [ -n "${conflict_group}" ] && [ "${conflict_group}" != "${SANDBOX_USER}" ]; t
 fi
 
 getent group  "${SANDBOX_USER}" >/dev/null || groupadd -g "${SANDBOX_GID}" "${SANDBOX_USER}"
-getent passwd "${SANDBOX_USER}" >/dev/null || useradd  -u "${SANDBOX_UID}" -g "${SANDBOX_GID}" -m -s /bin/bash "${SANDBOX_USER}"
+getent passwd "${SANDBOX_USER}" >/dev/null || useradd  -u "${SANDBOX_UID}" -g "${SANDBOX_GID}" -M -s /bin/bash -d "/home/${SANDBOX_USER}" "${SANDBOX_USER}"
+
+# Ensure the home directory exists, is owned by the user, populated from /etc/skel.
+user_home="/home/${SANDBOX_USER}"
+if [ ! -d "${user_home}" ]; then
+    mkdir -p "${user_home}"
+    if [ -d /etc/skel ]; then
+        cp -aT /etc/skel "${user_home}"
+    fi
+fi
+chown -R "${SANDBOX_USER}:${SANDBOX_USER}" "${user_home}"
+chmod 750 "${user_home}"
 
 # Passwordless sudo for the sandbox user (effective once sudo is installed).
 mkdir -p /etc/sudoers.d
