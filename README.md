@@ -1,69 +1,263 @@
 # Sandbox Manager
 
-Sandbox Manager is a tool designed to simplify the management of isolated agent sandboxes on Linux systems. By leveraging **Podman**, it provides a lightweight, daemonless, and secure way to run AI agents or untrusted code in strictly controlled environments.
+A lightweight, daemonless CLI for running isolated dev sandboxes on Linux,
+built on **rootless Podman**. Designed for spinning up disposable Linux
+environments — useful for running AI agents, testing untrusted code, trying
+new distros, or just keeping your host clean.
+
+```
+$ sandbox create debian:trixie work
+…
+✔ Sandbox 'work' is ready.
+
+  Open a shell:     sandbox shell work
+  Open as root:     sandbox shell --root work
+  Run a command:    sandbox exec work <cmd>
+  Stop / remove:    sandbox stop work  |  sandbox rm work
+```
+
+---
 
 ## 🚀 Features
 
-- **High Isolation**: Uses Podman containers to ensure agents are decoupled from your host system.
-- **Easy Management**: Simplified CLI/API to create, start, stop, and delete sandboxes.
-- **Linux Optimized**: Built specifically for Linux environments to take full advantage of containerization technologies.
-- **Agent-Centric**: Designed with the lifecycle of an AI agent in mind (ephemeral environments, state persistence, etc.).
+- **Rootless isolation** — uses Podman with `--userns=keep-id`; your host
+  UID maps to the same UID inside the container, so files on shared
+  volumes have sensible ownership.
+- **GUI-aware** — X11 sockets, Wayland sockets, `XDG_RUNTIME_DIR`, and
+  `/dev/dri` are wired up by default. GUI apps inside sandboxes Just Work.
+- **Per-distro fix-up scripts** — fetched once from this repo into your
+  config dir, then user-editable. UTF-8 locale, sudo, user provisioning,
+  `/etc/hosts`, `/tmp/runtime-user` all handled.
+- **Snapshot / restore** — `podman commit` wrapped as a one-liner.
+- **Bring-your-own image** — works with stock images (`ubuntu:latest`,
+  `debian:trixie`, `archlinux:latest`, `alpine:latest`, `fedora:latest`)
+  or with images built from the included `Containerfiles/`.
+- **Dry-run mode** — `--dry-run` prints every podman / filesystem command
+  it *would* run, without touching the system. Handy for debugging or
+  understanding what the tool is doing.
 
 ## 🛠️ Requirements
 
-- Linux
-- [Podman](https://podman.io/)
+- **Linux** (tested on rootless Podman setups; not designed for macOS/WSL).
+- **[Podman](https://podman.io/)** ≥ 4.0 with rootless support configured
+  (`/etc/subuid` and `/etc/subgid` entries for your user).
+- **Rust toolchain** (only for building from source) — `rustc` 1.75+ or
+  any 2024-edition-capable compiler. Install via [rustup](https://rustup.rs/).
+- **Network access** on first sandbox creation, so the fix-up scripts can
+  be fetched. After that, sandboxes can be created offline.
 
-## 📋 Installation
+## 📦 Build & install
 
-*(Installation instructions coming soon)*
+Clone and build with cargo:
+
+```bash
+git clone https://github.com/tcreswick/sandbox-manager.git
+cd sandbox-manager/sandbox
+cargo build --release
+```
+
+The binary lands at `target/release/sandbox`. Either run it from there, or
+install it onto your `$PATH`:
+
+```bash
+# install to ~/.cargo/bin (rustup default), available immediately if that's on $PATH
+cargo install --path .
+
+# or copy the binary somewhere on PATH manually
+sudo cp target/release/sandbox /usr/local/bin/
+```
+
+Verify the install:
+
+```bash
+sandbox --help
+```
+
+### Updating
+
+```bash
+cd sandbox-manager && git pull
+cd sandbox && cargo install --path . --force
+```
+
+Fix-up scripts in `~/.config/sandbox/fixups/` are **not** overwritten on
+update — see the [Fix-up scripts](#-fix-up-scripts) section for how to
+refresh them.
 
 ## 📖 Usage
 
-*(Usage examples coming soon)*
+### Quick start
+
+```bash
+sandbox create debian:trixie work     # create a container called 'work'
+sandbox shell work                    # open a login shell, lands in /home/$USER
+sandbox exec work apt list --installed
+sandbox stop work                     # stop without removing
+sandbox start work                    # resume later
+sandbox rm work                       # remove the container (home dir kept)
+sandbox rm --purge work               # also delete the persistent home dir
+```
+
+### Command reference
+
+| Command                                 | Description                                    |
+|-----------------------------------------|------------------------------------------------|
+| `sandbox build <variant>`               | Build the bundled `Containerfiles/<v>.Dockerfile` into `sandbox:<v>` |
+| `sandbox create <image> <name>`         | Start a new sandbox from `<image>`             |
+| `sandbox shell <name>`                  | Open an interactive `bash -l` login shell      |
+| `sandbox shell --root <name>`           | Open a root shell (no `sudo` needed)           |
+| `sandbox exec <name> <cmd…>`            | Run a one-off command as your user             |
+| `sandbox exec --root <name> <cmd…>`     | Run a one-off command as root                  |
+| `sandbox stop <name>`                   | Stop a running sandbox                         |
+| `sandbox start <name>`                  | Resume a stopped sandbox                       |
+| `sandbox rm <name>`                     | Remove the container (keeps the home dir)      |
+| `sandbox rm --purge <name>`             | Remove the container *and* the home dir        |
+| `sandbox list`                          | List all sandboxes                             |
+| `sandbox snapshot <name> <tag>`         | `podman commit` the writable layer as `<name>:<tag>` |
+| `sandbox restore <name> <tag>`          | Recreate `<name>` from a snapshot tag          |
+
+### Global flags
+
+| Flag           | Effect                                                              |
+|----------------|---------------------------------------------------------------------|
+| `-v, --verbose` | Print every podman/filesystem command before running it             |
+| `--dry-run`     | Print what *would* be done without executing it (safe to run anywhere) |
+
+### `create` flags
+
+| Flag                  | Effect                                                       |
+|-----------------------|--------------------------------------------------------------|
+| `--no-gui`            | Omit X11/Wayland socket bind mounts                          |
+| `--no-gpu`            | Omit `/dev/dri` passthrough                                  |
+| `--no-network-host`   | Use bridged networking instead of `--network=host`           |
+| `--home <PATH>`       | Override the default home directory bind mount               |
+| `--work <PATH>`       | Additionally bind-mount `<PATH>` at `/work` inside           |
+| `--fixup <SCRIPT>`    | Force a specific fix-up script, bypassing `mapping.conf`     |
+
+### What happens during `sandbox create`?
+
+1. Ensure `~/sandboxes/<name>/` exists on the host (or `--home`'s value).
+2. `podman run -d --userns=keep-id …` with X11/Wayland/GPU bind-mounts and
+   `LANG` / `LC_ALL` / `LANGUAGE` passed through from your shell environment.
+3. Detect the guest's `PRETTY_NAME` from `/etc/os-release`.
+4. Look up the matching fix-up script in `~/.config/sandbox/fixups/mapping.conf`,
+   fetching it from GitHub on first use.
+5. Pipe that script into `podman exec -i --user root <name> bash -s` with
+   `SANDBOX_USER` / `SANDBOX_UID` / `SANDBOX_GID` / `SANDBOX_NAME` env vars.
+6. Print a green success banner with quick-start commands.
+
+### Persistent home directories
+
+By default each sandbox gets `~/sandboxes/<name>/` bind-mounted at `/home`
+inside the container. Your user's home (`/home/$USER`) is created on first
+run from `/etc/skel`. This means:
+
+- Files you create in `~` inside the sandbox survive `sandbox rm`.
+- You can `sandbox rm` and `sandbox create` again with the same name to
+  get a fresh container against the same persistent home.
+- Use `sandbox rm --purge <name>` to delete the home dir too.
+- Use `--home <PATH>` on `create` to point at a different host directory.
 
 ## 🧩 Fix-up scripts
 
-When `sandbox create` starts a container, it runs a short shell script as
-`root` inside the container to:
+When `sandbox create` starts a container, it runs a short shell script
+inside as `root` to:
 
-- create a user/group matching the host user (resolving UID/GID collisions),
+- create a user matching the host (resolving UID/GID collisions with any
+  preinstalled user like Ubuntu's `ubuntu` at UID 1000),
+- materialise the home directory from `/etc/skel`,
 - add a `127.0.1.1 <name>` entry to `/etc/hosts`,
-- set up `/tmp/runtime-user` for the user.
+- prepare `/tmp/runtime-user` for the user (Wayland, etc.),
+- write a passwordless `/etc/sudoers.d/<user>` entry,
+- install a sensible default package set (sudo, curl, ca-certificates,
+  build-essential on Debian, locale generation, etc.).
 
-These scripts live on GitHub at
+### Where they live
+
+Scripts live on GitHub at
 [`fixups/`](https://github.com/tcreswick/sandbox-manager/tree/main/fixups)
 and are **fetched once on demand** into `~/.config/sandbox/fixups/`. After
 the first fetch the local copy is canonical and `sandbox` will not
 overwrite it — edit freely.
 
-### Selection
+### Distro selection
 
 - Sandbox reads `PRETTY_NAME` from `/etc/os-release` inside the freshly
   started container.
-- It looks up the matching script in `~/.config/sandbox/fixups/mapping.conf`.
-- Each line is `<regex>  <script-filename>` (the **last** whitespace-separated
-  token is the filename; everything before it is the regex, so regexes may
-  contain literal spaces). First match wins; the trailing `.*` line is the
-  catch-all.
+- It matches the value against the regexes in
+  `~/.config/sandbox/fixups/mapping.conf`.
+- Each line is `<regex>  <script-filename>` (the **last** whitespace-
+  separated token is the filename; everything before it is the regex, so
+  regexes may contain literal spaces).
+- First match wins. The trailing `.*` line is the catch-all.
+
+Built-in scripts: `debian.sh`, `ubuntu.sh`, `arch.sh`, `fedora.sh`,
+`alpine.sh`, and `default.sh` as fallback.
 
 ### Customising
 
-- **Edit a script**: just open `~/.config/sandbox/fixups/<script>.sh`.
-- **Add a distro**: drop a new script in the cache directory, then add a
-  regex line in `mapping.conf` **above** the `.*` fallback.
-- **Refresh from upstream**: delete the file (or the whole directory) and
-  re-run `sandbox create` — missing files are re-fetched.
-- **Force a specific script**: `sandbox create --fixup myscript.sh …`
-  bypasses the regex matching.
-- **Use a different source**: set `SANDBOX_FIXUPS_URL` to point at any
-  raw URL prefix (e.g. a fork or a private mirror).
+| Goal | How |
+|---|---|
+| Edit a script             | Open `~/.config/sandbox/fixups/<script>.sh` |
+| Add a new distro          | Drop a new script in the cache dir; add a regex line in `mapping.conf` *above* `.*` |
+| Refresh from upstream     | `rm` the file (or the whole dir) and re-run `sandbox create` |
+| Force a specific script   | `sandbox create --fixup myscript.sh …` |
+| Use a fork as the source  | `export SANDBOX_FIXUPS_URL=https://raw.githubusercontent.com/<you>/sandbox-manager/main/fixups/` |
 
-See [`fixups/README.md`](fixups/README.md) for the full script contract.
+See [`fixups/README.md`](fixups/README.md) for the full script contract
+(input env vars, required behaviour, idempotency requirements).
+
+## 🌐 Environment variables
+
+| Variable                | Purpose                                                  |
+|-------------------------|----------------------------------------------------------|
+| `SANDBOX_FIXUPS_URL`    | Base URL for fetching fix-up scripts (override default)  |
+| `LANG` / `LC_ALL` / `LANGUAGE` | Passed through to every new container so locale matches the host |
+| `DISPLAY` / `WAYLAND_DISPLAY` / `XDG_RUNTIME_DIR` / `XAUTHORITY` | Picked up automatically for GUI passthrough (unless `--no-gui`) |
+| `NO_COLOR`              | Disable ANSI colours in terminal output                  |
 
 ## 🛡️ Security
 
-Sandbox Manager prioritizes security by utilizing Podman's rootless container capabilities, ensuring that even if an agent escapes the application layer, it remains constrained by standard Linux user permissions and container namespaces.
+Sandbox Manager uses Podman's **rootless** container model: even if a
+process inside a sandbox escapes the container, it ends up confined to
+the calling user's privileges on the host. Combined with user namespaces
+(`--userns=keep-id`), file ownership inside the sandbox mirrors the host
+without any setuid trickery.
+
+That said, this is a **dev sandbox**, not a hardened security boundary.
+By default sandboxes run with `--network=host`, the user's X11/Wayland
+sockets are exposed (so GUI apps can talk to the host display server),
+and `/dev/dri` is passed through. If you need stronger isolation, pass
+`--no-network-host --no-gui --no-gpu` on `create`.
+
+## 🧪 Development
+
+```bash
+cd sandbox
+cargo build              # debug build
+cargo test               # run unit tests (covers fixup mapping parser)
+cargo run -- --help      # run without installing
+cargo run -- --dry-run create ubuntu:latest test   # exercise create logic offline
+```
+
+The repo layout:
+
+```
+.
+├── README.md             — you are here
+├── fixups/               — per-distro fix-up shell scripts (fetched on demand)
+│   ├── README.md           script contract
+│   ├── mapping.conf        regex → script (first match wins)
+│   ├── debian.sh / ubuntu.sh / arch.sh / fedora.sh / alpine.sh / default.sh
+├── sandbox/              — Rust CLI crate
+│   ├── Cargo.toml
+│   ├── Containerfiles/   — optional `sandbox build` Dockerfiles
+│   └── src/
+│       ├── main.rs         CLI, subcommands, podman invocation
+│       ├── fixups.rs       fetch/cache/parse/select fix-up scripts
+│       └── term.rs         ANSI/TTY helpers
+└── sandbox-tool-spec.md  — design notes
+```
 
 ## 📄 License
 
