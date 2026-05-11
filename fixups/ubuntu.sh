@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Sandbox fix-up script for Debian / Ubuntu family.
+# Sandbox fix-up script for Ubuntu.
 #
-# Contract (see fixups/README.md):
-#   Inputs:  $SANDBOX_USER  $SANDBOX_UID  $SANDBOX_GID  $SANDBOX_NAME
-#   Effect:  ensure host user exists inside container, /etc/hosts entry,
-#            /tmp/runtime-user prepared.
-#   Must be idempotent.
+# Differs from debian.sh in that we don't run `tasksel install standard` —
+# Ubuntu's 'standard' task pulls in packages (snapd, ubuntu-advantage-tools,
+# popularity-contest, update-notifier, etc.) whose postinsts misbehave in a
+# container even with policy-rc.d in place. Instead we install an explicit,
+# curated list of the genuinely useful "standard system utilities".
 
 set -e
 
@@ -42,18 +42,13 @@ chmod 700 /tmp/runtime-user
 # --------------------------------------------------------------------------
 # Sensible default packages
 #
-# Everything below is a convenience baseline that most sandboxes will want.
-# It is safe to comment out any or all of these lines if you prefer a leaner
-# container; the user/group/hosts/runtime-user setup above is what actually
-# makes the sandbox usable.
+# Convenience baseline — safe to comment out any/all of these lines if you
+# prefer a leaner container.
 # --------------------------------------------------------------------------
 export DEBIAN_FRONTEND=noninteractive
 export DEBCONF_NONINTERACTIVE_SEEN=true
 
-# Prevent package postinsts from trying to start services (systemctl/initctl/
-# invoke-rc.d will all see exit 101 and skip). Without this, packages pulled
-# in by 'tasksel install standard' often abort with 'apt-get failed (100)'
-# because there is no init system inside the container.
+# Prevent package postinsts from trying to start services in a container.
 cat > /usr/sbin/policy-rc.d <<'EOF'
 #!/bin/sh
 exit 101
@@ -62,9 +57,7 @@ chmod +x /usr/sbin/policy-rc.d
 
 apt-get update
 
-# Preseed locale selection so the 'locales' package postinst generates the
-# host's locale non-interactively (no debconf prompt). $LANG is passed in by
-# 'sandbox create' (-e LANG=...); we derive the charset from its '.' suffix.
+# Preseed locale generation so the 'locales' postinst is non-interactive.
 target_locale="${LANG:-C.UTF-8}"
 charset="${target_locale##*.}"
 if [ "${charset}" = "${target_locale}" ]; then
@@ -74,16 +67,18 @@ apt-get install -y --no-install-recommends debconf
 echo "locales locales/locales_to_be_generated multiselect ${target_locale} ${charset}" | debconf-set-selections
 echo "locales locales/default_environment_locale select ${target_locale}" | debconf-set-selections
 
+# Curated equivalent of `tasksel install standard`, minus the bits that
+# don't belong in a container (snapd, ubuntu-advantage-tools, popularity-
+# contest, update-notifier, unattended-upgrades, etc.).
 apt-get install -y --no-install-recommends \
-    locales sudo curl ca-certificates build-essential tasksel
+    locales sudo curl ca-certificates build-essential \
+    bash-completion less vim-tiny nano \
+    man-db file tree htop jq \
+    procps iproute2 iputils-ping dnsutils hostname
 
-# 'standard' brings in the Debian/Ubuntu "standard system utilities" task
-# (less, bash-completion, etc). Drop this line for a more minimal box.
-tasksel install standard
 apt-get upgrade -y
 apt-get clean
 rm -rf /var/lib/apt/lists/*
 
-# Remove the service-start block so any *future* in-container apt installs
-# the user runs interactively behave normally.
+# Restore default service-start behaviour for the user's own future installs.
 rm -f /usr/sbin/policy-rc.d
