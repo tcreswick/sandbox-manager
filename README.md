@@ -18,6 +18,49 @@ $ sandbox create debian:trixie work
 
 ---
 
+## ⚡ Quickstart (prebuilt binary)
+
+Grab the latest release tarball, extract, and drop the binary somewhere on
+your `$PATH`:
+
+```bash
+# Download the latest x86_64-linux-gnu release
+curl -L -o sandbox.tar.gz \
+  https://github.com/tcreswick/sandbox-manager/releases/latest/download/sandbox-1.0.0-x86_64-unknown-linux-gnu.tar.gz
+
+# (optional) verify the checksum
+curl -LO https://github.com/tcreswick/sandbox-manager/releases/latest/download/sha256sums.txt
+sha256sum -c sha256sums.txt --ignore-missing
+
+# Extract and install
+tar -xzf sandbox.tar.gz
+sudo install -m 0755 sandbox /usr/local/bin/sandbox
+
+# Verify
+sandbox --help
+```
+
+Then create your first sandbox:
+
+```bash
+sandbox create debian:trixie work
+sandbox shell work
+```
+
+> **Note — Podman is required.** Sandbox Manager is a thin wrapper around
+> **rootless [Podman](https://podman.io/)** (≥ 4.0). Install it from your
+> distro's package manager (`apt install podman`, `dnf install podman`,
+> `pacman -S podman`, …) and make sure rootless support is configured —
+> i.e. you have entries in `/etc/subuid` and `/etc/subgid` for your user.
+> Most modern distros set this up automatically when Podman is installed.
+>
+> The prebuilt binary is dynamically linked against glibc and will run on
+> any reasonably recent glibc-based Linux distribution. For musl systems
+> (e.g. Alpine) or other architectures, build from source — see
+> [Build & install](#-build--install) below.
+
+---
+
 ## 🚀 Features
 
 - **Rootless isolation** — uses Podman with `--userns=keep-id`; your host
