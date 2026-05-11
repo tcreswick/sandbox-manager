@@ -1,0 +1,35 @@
+# --- Rust ---
+target/
+**/target/
+*.rs.bk
+Cargo.lock.bak
+
+# --- Editor / IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.*.swp
+.*.swo
+
+# --- OS detritus ---
+.DS_Store
+Thumbs.db
+
+# --- Logs / temporary ---
+*.log
+*.tmp
+*.bak
+
+# --- Local environment ---
+.env
+.env.local
+
+# --- Sandbox-specific ---
+# User-mounted sandbox home directories, if anyone happens to clone the
+# repo into ~/sandboxes or has a stray symlink.
+sandboxes/
+
+# Empty placeholder dir from an older layout.
+/sandbox-manager/

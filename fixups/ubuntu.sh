@@ -100,8 +100,6 @@ apt-get install -y --no-install-recommends \
     procps iproute2 iputils-ping dnsutils hostname
 
 apt-get upgrade -y
-apt-get clean
-rm -rf /var/lib/apt/lists/*
 
 # Restore default service-start behaviour for the user's own future installs.
 rm -f /usr/sbin/policy-rc.d

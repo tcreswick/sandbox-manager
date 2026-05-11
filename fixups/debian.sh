@@ -107,8 +107,6 @@ apt-get install -y --no-install-recommends \
 # (less, bash-completion, etc). Drop this line for a more minimal box.
 tasksel install standard
 apt-get upgrade -y
-apt-get clean
-rm -rf /var/lib/apt/lists/*
 
 # Remove the service-start block so any *future* in-container apt installs
 # the user runs interactively behave normally.
