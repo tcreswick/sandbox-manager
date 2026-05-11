@@ -50,6 +50,10 @@ chmod 700 /tmp/runtime-user
 export DEBIAN_FRONTEND=noninteractive
 export DEBCONF_NONINTERACTIVE_SEEN=true
 
+# Capture the host locale *before* we override $LANG below, so the debconf
+# preseed further down generates the right locale.
+host_locale="${LANG:-C.UTF-8}"
+
 # Use C.UTF-8 *inside this script only* so package postinsts (perl etc.)
 # don't warn about $LANG (e.g. en_GB.UTF-8) not being generated yet. The
 # container's persistent env still has the host LANG; once the 'locales'
@@ -71,9 +75,9 @@ chmod +x /usr/sbin/policy-rc.d
 apt-get update
 
 # Preseed locale selection so the 'locales' package postinst generates the
-# host's locale non-interactively (no debconf prompt). $LANG is passed in by
-# 'sandbox create' (-e LANG=...); we derive the charset from its '.' suffix.
-target_locale="${LANG:-C.UTF-8}"
+# host's locale non-interactively (no debconf prompt). Uses $host_locale
+# captured above (we deliberately overrode $LANG to C.UTF-8 for the install).
+target_locale="${host_locale}"
 charset="${target_locale##*.}"
 if [ "${charset}" = "${target_locale}" ]; then
     charset="UTF-8"

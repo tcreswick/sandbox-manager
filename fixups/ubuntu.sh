@@ -48,6 +48,9 @@ chmod 700 /tmp/runtime-user
 export DEBIAN_FRONTEND=noninteractive
 export DEBCONF_NONINTERACTIVE_SEEN=true
 
+# Capture the host locale before we override $LANG below.
+host_locale="${LANG:-C.UTF-8}"
+
 # Use C.UTF-8 *inside this script only* so package postinsts (perl etc.)
 # don't warn about $LANG not being generated yet. The container's
 # persistent env still has the host LANG for the user's sessions.
@@ -64,7 +67,8 @@ chmod +x /usr/sbin/policy-rc.d
 apt-get update
 
 # Preseed locale generation so the 'locales' postinst is non-interactive.
-target_locale="${LANG:-C.UTF-8}"
+# Use the captured host_locale, not the overridden $LANG.
+target_locale="${host_locale}"
 charset="${target_locale##*.}"
 if [ "${charset}" = "${target_locale}" ]; then
     charset="UTF-8"
