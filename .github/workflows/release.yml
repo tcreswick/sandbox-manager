@@ -1,0 +1,109 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-release:
+    name: Build x86_64-unknown-linux-gnu and publish release
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Cache cargo registry, git and build target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            sandbox/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('sandbox/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build (release, x86_64-unknown-linux-gnu)
+        working-directory: sandbox
+        run: cargo build --release --locked --target x86_64-unknown-linux-gnu
+
+      - name: Strip binary
+        run: strip sandbox/target/x86_64-unknown-linux-gnu/release/sandbox
+
+      - name: Compute VERSION
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="0.0.0-dev"
+          fi
+          echo "VERSION=${VERSION}" >> "${GITHUB_ENV}"
+          echo "Resolved VERSION=${VERSION}"
+
+      - name: Stage release directory
+        run: |
+          set -euo pipefail
+          STAGE="dist/sandbox-${VERSION}-x86_64-unknown-linux-gnu"
+          mkdir -p "${STAGE}"
+          cp sandbox/target/x86_64-unknown-linux-gnu/release/sandbox "${STAGE}/"
+          cp README.md "${STAGE}/"
+          cp LICENSE "${STAGE}/"
+          ls -la "${STAGE}"
+
+      - name: Create tarball
+        run: |
+          set -euo pipefail
+          tar -czf "dist/sandbox-${VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
+            -C dist "sandbox-${VERSION}-x86_64-unknown-linux-gnu"
+          ls -la dist
+
+      - name: Generate SHA256 checksums
+        working-directory: dist
+        run: |
+          sha256sum "sandbox-${VERSION}-x86_64-unknown-linux-gnu.tar.gz" > sha256sums.txt
+          cat sha256sums.txt
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/sandbox-${{ env.VERSION }}-x86_64-unknown-linux-gnu.tar.gz
+            dist/sha256sums.txt
+          body: |
+            ## sandbox ${{ github.ref_name }}
+
+            Prebuilt binary for **`x86_64-unknown-linux-gnu`**.
+
+            - **Target triple:** `x86_64-unknown-linux-gnu`
+            - **Built on:** `ubuntu-22.04` (glibc ~2.35 baseline)
+            - **Toolchain:** Rust stable (whatever `dtolnay/rust-toolchain@stable` resolved to at build time)
+            - **Linkage:** dynamically linked against the host's glibc; will run on any reasonably recent glibc-based Linux distribution, but **not** on musl-based systems (e.g. Alpine) without a rebuild.
+            - **Contents:** `sandbox` binary, `README.md`, `LICENSE`. Fix-up scripts are **not** bundled — they are fetched from the upstream repository on first use into `~/.config/sandbox/fixups/` (override with `SANDBOX_FIXUPS_URL` for offline / mirrored installs).
+
+            Verify the download:
+
+            ```bash
+            sha256sum -c sha256sums.txt
+            ```

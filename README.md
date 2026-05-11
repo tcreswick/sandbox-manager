@@ -258,6 +258,45 @@ The repo layout:
 └── sandbox-tool-spec.md  — design notes
 ```
 
+### Releasing
+
+Releases are produced by `.github/workflows/release.yml`, which builds a
+stripped `x86_64-unknown-linux-gnu` binary on `ubuntu-22.04` (glibc ~2.35
+baseline) whenever a `v*` tag is pushed.
+
+To cut a release:
+
+```bash
+# 1. Bump the crate version
+$EDITOR sandbox/Cargo.toml          # update version = "X.Y.Z"
+(cd sandbox && cargo generate-lockfile)
+git add sandbox/Cargo.toml sandbox/Cargo.lock
+git commit -m "Release vX.Y.Z"
+git push origin main
+
+# 2. Tag and push
+git tag vX.Y.Z
+git push origin vX.Y.Z
+```
+
+The workflow then:
+
+1. Builds `cargo build --release --locked --target x86_64-unknown-linux-gnu`.
+2. Strips the binary.
+3. Stages `sandbox-X.Y.Z-x86_64-unknown-linux-gnu/{sandbox,README.md,LICENSE}`
+   (fix-up scripts are **not** bundled — they're fetched at runtime).
+4. Produces `sandbox-X.Y.Z-x86_64-unknown-linux-gnu.tar.gz` and
+   `sha256sums.txt`.
+5. Publishes a GitHub release with both files attached and auto-generated
+   release notes.
+
+You can also trigger the workflow manually via **Actions → release → Run
+workflow** for a dry run; the upload step is gated on a tag ref, so a
+manual dispatch builds and packages without publishing anything.
+
+The produced binary is **dynamically linked against glibc**. For musl /
+Alpine, rebuild against `x86_64-unknown-linux-musl` from source.
+
 ## 📄 License
 
-[MIT](LICENSE)
+[MIT](LICENSE) © Luumo Factory Limited
