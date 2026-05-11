@@ -16,11 +16,7 @@ $ sandbox create debian:trixie work
   Stop / remove:    sandbox stop work  |  sandbox rm work
 ```
 
-![sandbox-manager demo](docs/demo.gif)
-
-> The GIF above is regenerated from [`docs/demo.tape`](docs/demo.tape) on a
-> real rootless-Podman host. See [`docs/README.md`](docs/README.md) for how
-> to re-record it.
+![sandbox-manager demo](docs/sandbox-demo.gif)
 
 ---
 
@@ -38,9 +34,9 @@ curl -L -o sandbox.tar.gz \
 curl -LO https://github.com/tcreswick/sandbox-manager/releases/latest/download/sha256sums.txt
 sha256sum -c sha256sums.txt --ignore-missing
 
-# Extract and install
+# Extract (creates sandbox-1.0.0-x86_64-unknown-linux-gnu/) and install
 tar -xzf sandbox.tar.gz
-sudo install -m 0755 sandbox /usr/local/bin/sandbox
+sudo install -m 0755 sandbox-1.0.0-x86_64-unknown-linux-gnu/sandbox /usr/local/bin/sandbox
 
 # Verify
 sandbox --help
