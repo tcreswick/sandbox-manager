@@ -33,6 +33,14 @@ mkdir -p /tmp/runtime-user
 chown "${SANDBOX_USER}:${SANDBOX_USER}" /tmp/runtime-user
 chmod 700 /tmp/runtime-user
 
+# Default UTF-8 locale for login shells.
+mkdir -p /etc/profile.d
+cat > /etc/profile.d/sandbox-locale.sh <<'EOF'
+export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
+EOF
+chmod 644 /etc/profile.d/sandbox-locale.sh
+
 # --------------------------------------------------------------------------
 # Sensible default packages
 #

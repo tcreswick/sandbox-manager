@@ -39,6 +39,16 @@ mkdir -p /tmp/runtime-user
 chown "${SANDBOX_USER}:${SANDBOX_USER}" /tmp/runtime-user
 chmod 700 /tmp/runtime-user
 
+# Default UTF-8 locale for login shells. C.UTF-8 is built into glibc, so no
+# 'locales' package or locale-gen is required. Switch to en_GB.UTF-8 etc. if
+# you'd rather have a regional locale (you'll then also need:
+#   apt-get install -y locales && locale-gen en_GB.UTF-8 ).
+cat > /etc/profile.d/sandbox-locale.sh <<'EOF'
+export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
+EOF
+chmod 644 /etc/profile.d/sandbox-locale.sh
+
 # --------------------------------------------------------------------------
 # Sensible default packages
 #
