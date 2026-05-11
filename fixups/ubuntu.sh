@@ -48,6 +48,12 @@ chmod 700 /tmp/runtime-user
 export DEBIAN_FRONTEND=noninteractive
 export DEBCONF_NONINTERACTIVE_SEEN=true
 
+# Use C.UTF-8 *inside this script only* so package postinsts (perl etc.)
+# don't warn about $LANG not being generated yet. The container's
+# persistent env still has the host LANG for the user's sessions.
+export LANG=C.UTF-8
+unset LC_ALL LANGUAGE
+
 # Prevent package postinsts from trying to start services in a container.
 cat > /usr/sbin/policy-rc.d <<'EOF'
 #!/bin/sh

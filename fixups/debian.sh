@@ -50,6 +50,14 @@ chmod 700 /tmp/runtime-user
 export DEBIAN_FRONTEND=noninteractive
 export DEBCONF_NONINTERACTIVE_SEEN=true
 
+# Use C.UTF-8 *inside this script only* so package postinsts (perl etc.)
+# don't warn about $LANG (e.g. en_GB.UTF-8) not being generated yet. The
+# container's persistent env still has the host LANG; once the 'locales'
+# package is installed below, that locale becomes available for the user's
+# subsequent sessions.
+export LANG=C.UTF-8
+unset LC_ALL LANGUAGE
+
 # Prevent package postinsts from trying to start services (systemctl/initctl/
 # invoke-rc.d will all see exit 101 and skip). Without this, packages pulled
 # in by 'tasksel install standard' often abort with 'apt-get failed (100)'
