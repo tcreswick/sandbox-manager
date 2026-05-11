@@ -16,6 +16,12 @@ $ sandbox create debian:trixie work
   Stop / remove:    sandbox stop work  |  sandbox rm work
 ```
 
+![sandbox-manager demo](docs/demo.gif)
+
+> The GIF above is regenerated from [`docs/demo.tape`](docs/demo.tape) on a
+> real rootless-Podman host. See [`docs/README.md`](docs/README.md) for how
+> to re-record it.
+
 ---
 
 ## ⚡ Quickstart (prebuilt binary)
