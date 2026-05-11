@@ -28,3 +28,10 @@ getent passwd "${SANDBOX_USER}" >/dev/null || useradd  -u "${SANDBOX_UID}" -g "$
 mkdir -p /tmp/runtime-user
 chown "${SANDBOX_USER}:${SANDBOX_USER}" /tmp/runtime-user
 chmod 700 /tmp/runtime-user
+
+# --------------------------------------------------------------------------
+# Sensible default packages
+#
+# Convenience baseline — safe to comment out if you want a leaner container.
+# --------------------------------------------------------------------------
+pacman -Sy --noconfirm --needed sudo curl ca-certificates

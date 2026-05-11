@@ -45,9 +45,11 @@ shell defaults, etc.
 ## Mapping file
 
 `mapping.conf` is plain text: `<regex>  <script-filename>`, one per line.
-First match wins. A trailing `.*` line is the catch-all fallback. Regexes
-are matched against the `PRETTY_NAME` field of `/etc/os-release` inside
-the container.
+The **last whitespace-separated token** on the line is the script filename;
+everything before it is the regex. This means regexes can contain literal
+spaces (e.g. `^Ubuntu 22\.`). First match wins. A trailing `.*` line is
+the catch-all fallback. Regexes are matched against the `PRETTY_NAME`
+field of `/etc/os-release` inside the container.
 
 Examples:
 

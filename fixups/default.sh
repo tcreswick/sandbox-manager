@@ -27,3 +27,27 @@ getent passwd "${SANDBOX_USER}" >/dev/null || useradd  -u "${SANDBOX_UID}" -g "$
 mkdir -p /tmp/runtime-user
 chown "${SANDBOX_USER}:${SANDBOX_USER}" /tmp/runtime-user
 chmod 700 /tmp/runtime-user
+
+# --------------------------------------------------------------------------
+# Sensible default packages
+#
+# This fallback script doesn't know the distro's package manager. Detect the
+# common ones and install sudo + curl + ca-certificates where possible.
+# Safe to comment out, or replace with a distro-specific block.
+# --------------------------------------------------------------------------
+if command -v apt-get >/dev/null 2>&1; then
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update && apt-get install -y --no-install-recommends sudo curl ca-certificates
+elif command -v dnf >/dev/null 2>&1; then
+    dnf install -y sudo curl ca-certificates
+elif command -v microdnf >/dev/null 2>&1; then
+    microdnf install -y sudo curl ca-certificates
+elif command -v yum >/dev/null 2>&1; then
+    yum install -y sudo curl ca-certificates
+elif command -v pacman >/dev/null 2>&1; then
+    pacman -Sy --noconfirm --needed sudo curl ca-certificates
+elif command -v apk >/dev/null 2>&1; then
+    apk add --no-cache sudo curl ca-certificates
+elif command -v zypper >/dev/null 2>&1; then
+    zypper --non-interactive install sudo curl ca-certificates
+fi

@@ -26,3 +26,17 @@ getent passwd "${SANDBOX_USER}" >/dev/null || useradd  -u "${SANDBOX_UID}" -g "$
 mkdir -p /tmp/runtime-user
 chown "${SANDBOX_USER}:${SANDBOX_USER}" /tmp/runtime-user
 chmod 700 /tmp/runtime-user
+
+# --------------------------------------------------------------------------
+# Sensible default packages
+#
+# Convenience baseline — safe to comment out if you want a leaner container.
+# 'dnf' on minimal images may not be present; fall back to 'microdnf' / 'yum'.
+# --------------------------------------------------------------------------
+if command -v dnf >/dev/null 2>&1; then
+    dnf install -y sudo curl ca-certificates
+elif command -v microdnf >/dev/null 2>&1; then
+    microdnf install -y sudo curl ca-certificates
+elif command -v yum >/dev/null 2>&1; then
+    yum install -y sudo curl ca-certificates
+fi

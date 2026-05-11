@@ -33,3 +33,22 @@ getent passwd "${SANDBOX_USER}" >/dev/null || useradd  -u "${SANDBOX_UID}" -g "$
 mkdir -p /tmp/runtime-user
 chown "${SANDBOX_USER}:${SANDBOX_USER}" /tmp/runtime-user
 chmod 700 /tmp/runtime-user
+
+# --------------------------------------------------------------------------
+# Sensible default packages
+#
+# Everything below is a convenience baseline that most sandboxes will want.
+# It is safe to comment out any or all of these lines if you prefer a leaner
+# container; the user/group/hosts/runtime-user setup above is what actually
+# makes the sandbox usable.
+# --------------------------------------------------------------------------
+export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get install -y --no-install-recommends \
+    sudo curl ca-certificates build-essential tasksel
+# 'standard' brings in the Debian/Ubuntu "standard system utilities" task
+# (less, bash-completion, locales, etc). Drop this line for a more minimal box.
+tasksel install standard
+apt-get upgrade -y
+apt-get clean
+rm -rf /var/lib/apt/lists/*
