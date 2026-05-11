@@ -29,9 +29,10 @@ $ sandbox create debian:trixie work
   config dir, then user-editable. UTF-8 locale, sudo, user provisioning,
   `/etc/hosts`, `/tmp/runtime-user` all handled.
 - **Snapshot / restore** — `podman commit` wrapped as a one-liner.
-- **Bring-your-own image** — works with stock images (`ubuntu:latest`,
-  `debian:trixie`, `archlinux:latest`, `alpine:latest`, `fedora:latest`)
-  or with images built from the included `Containerfiles/`.
+- **Bring-your-own image** — works with any image (`ubuntu:latest`,
+  `debian:trixie`, `archlinux:latest`, `alpine:latest`, `fedora:latest`,
+  derived images you've built yourself, etc.). Fix-up scripts handle the
+  rest at create-time.
 - **Dry-run mode** — `--dry-run` prints every podman / filesystem command
   it *would* run, without touching the system. Handy for debugging or
   understanding what the tool is doing.
@@ -102,7 +103,6 @@ sandbox rm --purge work               # also delete the persistent home dir
 
 | Command                                 | Description                                    |
 |-----------------------------------------|------------------------------------------------|
-| `sandbox build <variant>`               | Build the bundled `Containerfiles/<v>.Dockerfile` into `sandbox:<v>` |
 | `sandbox create <image> <name>`         | Start a new sandbox from `<image>`             |
 | `sandbox shell <name>`                  | Open an interactive `bash -l` login shell      |
 | `sandbox shell --root <name>`           | Open a root shell (no `sudo` needed)           |
@@ -251,7 +251,6 @@ The repo layout:
 │   ├── debian.sh / ubuntu.sh / arch.sh / fedora.sh / alpine.sh / default.sh
 ├── sandbox/              — Rust CLI crate
 │   ├── Cargo.toml
-│   ├── Containerfiles/   — optional `sandbox build` Dockerfiles
 │   └── src/
 │       ├── main.rs         CLI, subcommands, podman invocation
 │       ├── fixups.rs       fetch/cache/parse/select fix-up scripts

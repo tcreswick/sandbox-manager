@@ -26,11 +26,6 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Build a sandbox image (e.g. debian-trixie)
-    Build {
-        /// The variant to build (e.g. debian-trixie, arch)
-        variant: String,
-    },
     /// Create and start a sandbox container
     Create {
         /// The image to use
@@ -459,27 +454,6 @@ fn main() -> Result<()> {
     let manager = SandboxManager::new(cli.verbose, cli.dry_run)?;
 
     match cli.command {
-        Commands::Build { variant } => {
-            let dockerfile = format!("Containerfiles/{}.Dockerfile", variant);
-            let (user, uid, gid) = manager.get_user_info()?;
-
-            println!("Building variant: {}...", variant);
-            manager.run_podman(&[
-                "build",
-                "-f",
-                &dockerfile,
-                "--build-arg",
-                &format!("USERNAME={}", user),
-                "--build-arg",
-                &format!("USER_UID={}", uid),
-                "--build-arg",
-                &format!("USER_GID={}", gid),
-                "-t",
-                &format!("sandbox:{}", variant),
-                ".",
-            ])?;
-            println!("Successfully built sandbox:{}", variant);
-        }
         Commands::Create {
             image,
             name,
