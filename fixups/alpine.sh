@@ -29,6 +29,11 @@ if ! getent_passwd=$(awk -F: -v n="${SANDBOX_USER}" '$1==n {print; exit}' /etc/p
     adduser -D -u "${SANDBOX_UID}" -G "${SANDBOX_USER}" -s /bin/sh "${SANDBOX_USER}"
 fi
 
+# Passwordless sudo for the sandbox user (effective once sudo is installed).
+mkdir -p /etc/sudoers.d
+printf '%s ALL=(ALL:ALL) NOPASSWD: ALL\n' "${SANDBOX_USER}" > "/etc/sudoers.d/${SANDBOX_USER}"
+chmod 440 "/etc/sudoers.d/${SANDBOX_USER}"
+
 mkdir -p /tmp/runtime-user
 chown "${SANDBOX_USER}:${SANDBOX_USER}" /tmp/runtime-user
 chmod 700 /tmp/runtime-user

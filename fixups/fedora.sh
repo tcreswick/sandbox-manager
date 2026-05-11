@@ -23,6 +23,11 @@ fi
 getent group  "${SANDBOX_USER}" >/dev/null || groupadd -g "${SANDBOX_GID}" "${SANDBOX_USER}"
 getent passwd "${SANDBOX_USER}" >/dev/null || useradd  -u "${SANDBOX_UID}" -g "${SANDBOX_GID}" -m -s /bin/bash "${SANDBOX_USER}"
 
+# Passwordless sudo for the sandbox user (effective once sudo is installed).
+mkdir -p /etc/sudoers.d
+printf '%s ALL=(ALL:ALL) NOPASSWD: ALL\n' "${SANDBOX_USER}" > "/etc/sudoers.d/${SANDBOX_USER}"
+chmod 440 "/etc/sudoers.d/${SANDBOX_USER}"
+
 mkdir -p /tmp/runtime-user
 chown "${SANDBOX_USER}:${SANDBOX_USER}" /tmp/runtime-user
 chmod 700 /tmp/runtime-user
